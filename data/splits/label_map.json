@@ -1,0 +1,22 @@
+{
+  "label2id": {
+    "belly_pain": 0,
+    "burping": 1,
+    "cold_hot": 2,
+    "discomfort": 3,
+    "hungry": 4,
+    "lonely": 5,
+    "scared": 6,
+    "tired": 7
+  },
+  "id2label": {
+    "0": "belly_pain",
+    "1": "burping",
+    "2": "cold_hot",
+    "3": "discomfort",
+    "4": "hungry",
+    "5": "lonely",
+    "6": "scared",
+    "7": "tired"
+  }
+}
