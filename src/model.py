@@ -82,3 +82,5 @@ else:
 
 model.to(device)
 model.eval()
+
+print("Model loaded and ready on device:", device)

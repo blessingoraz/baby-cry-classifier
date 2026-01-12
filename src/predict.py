@@ -3,6 +3,9 @@ import json
 import torch
 import numpy as np
 
+from fastapi import FastAPI, File, UploadFile, HTTPException
+from fastapi.responses import JSONResponse
+
 from src.model import model, device
 from src.preprocess import audio_to_mel_tensor
 
@@ -19,8 +22,3 @@ def predict_audio(path):
 
     return dict(zip(classes, probs.tolist()))
 
-# Example:
-audio_path = "data/raw/hungry/4be720ce-a5e5-4a48-930f-a212f8a239f6-1434737694572-1.7-f-48-hu.wav"
-
-result = predict_audio(audio_path)
-print(result)
