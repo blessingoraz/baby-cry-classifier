@@ -128,6 +128,59 @@ The selected checkpoint maximized macro-F1 on the validation set.
 Model artifacts are versioned and available via GitHub Releases.
 
 
+## Setup & Installation
+
+### Prerequisites
+- Python 3.9+
+- pip or conda
+- Docker for containerized deployment
+
+### Local Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/blessingoraz/baby-cry-classifier.git
+cd baby-cry-classifier
+```
+
+2. Create and activate virtual environment:
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Download model artifacts from [GitHub Releases v1.0.0](https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0):
+   - `best_lr_0.01_inner_512_drop_0.8.pt` → `models/checkpoints/`
+   - `baby_cry_classification_resnet18.onnx` → `models/onnx/` (for ONNX inference)
+
+## Quick Start
+
+### 1. FastAPI Server
+```bash
+uvicorn src.api:app --host 0.0.0.0 --port 8000 --reload
+```
+Then visit `http://localhost:8000/docs`
+
+### 2. Command Line
+```bash
+python scripts/test_predict.py path/to/audio.wav
+```
+
+### 3. Python Script
+```python
+from src.predict import predict_audio
+from src.utils import format_prediction
+
+probs = predict_audio("path/to/audio.wav")
+result = format_prediction(probs, top_k=3)
+print(f"Predicted: {result['label']} ({result['probability']:.2%})")
+```
+
 ## Inference & Deployment
 
 The trained model is exported to two formats:
@@ -141,6 +194,7 @@ The trained model is exported to two formats:
 
 
 ## Project Structure
+```
 src/
   __init__.py           # Package initialization
   model.py              # CryResNet architecture and model loading
@@ -169,31 +223,53 @@ tests/
   test_api.py           # FastAPI endpoint integration tests
   test_predict_e2e.py   # End-to-end tests with real audio
 lambda_function.py      # AWS Lambda handler for serverless deployment
-
-
-## Running Locally (FastAPI)
-1. Install dependencies
-`pip install -r requirements.txt`
-
-2. Download model artifacts
-
-Download the .pt file from the GitHub Release and place it in:
-`models/checkpoints`
-
-3. Start the API
-`uvicorn src.api:app --host 0.0.0.0 --port 8000 --reload`
-
-### Testing the API
-FastAPI Docs 
-
-Open your browser:
-`http://localhost:8000/docs`
-- Use the `/predict` endpoint
-- Upload a `.wav` file
-- Receive predicted label + probabilities
-
-Example response:
 ```
+
+## Docker Deployment
+
+### Build the Docker Image
+
+```bash
+docker build -t babycry-classifier:latest .
+```
+
+### Run the Container Locally
+
+```bash
+docker run -p 8000:8000 babycry-classifier:latest
+```
+
+Then access the API at `http://localhost:8000/docs`
+
+### Running Tests in Docker
+
+```bash
+docker run babycry-classifier:latest pytest tests/ -v
+```
+
+## API Usage
+
+### FastAPI Interactive Docs
+
+Once the server is running, visit: `http://localhost:8000/docs`
+
+**Endpoints:**
+- `GET /health` — Health check
+- `POST /predict` — Upload audio file and get classification
+  - Parameters: `file` (audio file), `top_k` (optional, default=3)
+  - Returns: `label`, `probability`, `top_k`, `all_probs`
+
+### Example cURL Request
+
+```bash
+curl -X POST "http://localhost:8000/predict" \
+  -F "file=@path/to/audio.wav" \
+  -F "top_k=5"
+```
+
+### Example Response
+
+```json
 {
   "label": "belly_pain",
   "probability": 0.62,
@@ -201,7 +277,17 @@ Example response:
     {"label": "belly_pain", "probability": 0.62},
     {"label": "hungry", "probability": 0.21},
     {"label": "discomfort", "probability": 0.09}
-  ]
+  ],
+  "all_probs": {
+    "belly_pain": 0.62,
+    "burping": 0.01,
+    "cold_hot": 0.00,
+    "discomfort": 0.09,
+    "hungry": 0.21,
+    "lonely": 0.02,
+    "scared": 0.03,
+    "tired": 0.02
+  }
 }
 ```
 
@@ -251,6 +337,45 @@ pytest tests/ --cov=src --cov-report=html
 - Model configuration and hyperparameters are documented
 - Trained artifacts are versioned via GitHub Releases
 
+## Common Commands
+
+```bash
+# Setup
+git clone https://github.com/blessingoraz/baby-cry-classifier.git
+cd baby-cry-classifier
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Run tests
+pytest tests/ -v
+pytest tests/test_api.py::TestPredictEndpoint -v
+
+# Start FastAPI server
+uvicorn src.api:app --reload
+
+# Test single audio file
+python scripts/test_predict.py data/raw/hungry/filename.wav
+
+# Docker
+docker build -t babycry-classifier .
+docker run -p 8000:8000 babycry-classifier
+```
+
+## Troubleshooting
+
+**Issue: Model file not found**
+- Solution: Download from [GitHub Releases](https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0) and place in `models/checkpoints/`
+
+**Issue: Port 8000 already in use**
+- Solution: Use a different port: `uvicorn src.api:app --port 8080 --reload`
+
+**Issue: Audio file format not supported**
+- Solution: Supported formats are `.wav`, `.mp3`, `.flac`, `.ogg`. Convert your file to `.wav` first.
+
+**Issue: Tests fail with missing dependencies**
+- Solution: Run `pip install -r requirements.txt` again or `pip install -r requirements.txt --upgrade`
+
 
 ## Demo (Screenshots / Video)
 ### Local Inference
@@ -291,7 +416,30 @@ https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0
 - Librosa: Audio analysis library
 - PyTorch & TorchVision
 - ONNX Runtime
+- FastAPI: Modern async web framework
+- Docker: Container deployment
 
-This project was built to demonstrate end-to-end ML engineering skills,
-including data preprocessing, model training, evaluation, deployment,
-and artifact management.
+---
+
+## Project Information
+
+**Author:** [blessingoraz](https://github.com/blessingoraz)
+
+**Repository:** [baby-cry-classifier](https://github.com/blessingoraz/baby-cry-classifier)
+
+**License:** [MIT](LICENSE)
+
+**Model Release:** [v1.0.0](https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0)
+
+---
+
+This project demonstrates end-to-end ML engineering practices:
+- Data exploration and preprocessing
+- Model training and hyperparameter tuning
+- Comprehensive unit and integration testing
+- Multi-format model export (PyTorch, ONNX)
+- Containerization with Docker
+- FastAPI REST service
+- AWS Lambda deployment readiness
+
+For questions or contributions, please open an [issue](https://github.com/blessingoraz/baby-cry-classifier/issues) or submit a [pull request](https://github.com/blessingoraz/baby-cry-classifier/pulls).
