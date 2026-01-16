@@ -6,9 +6,10 @@ import numpy as np
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 
-from src.model import model, device
+from src.model import load_model
 from src.preprocess import audio_to_mel_tensor
 
+model, device = load_model("models/checkpoints/best_lr_0.01_inner_512_drop_0.8.pt", device=torch.device("cpu"))
 with open("data/splits/label_map.json") as f:
    label_info = json.load(f)
 id2label = {int(k): v for k, v in label_info["id2label"].items()}

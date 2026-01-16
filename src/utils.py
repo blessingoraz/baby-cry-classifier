@@ -4,8 +4,15 @@ from typing import Dict, List, Tuple
 # label_map: list or dict mapping indices to labels, e.g. ["belly_pain","burping",...]
 def format_prediction(probs: Dict[str, float], top_k: int = 3):
     # probs is already a dict {label: prob}
+    if not probs:
+        raise ValueError("Probabilities dictionary cannot be empty")
+    
+    # Ensure top_k is positive
+    top_k = max(1, int(top_k))
+    
     items = sorted(probs.items(), key=lambda kv: kv[1], reverse=True)
     top = items[:top_k]
+    
     return {
         "label": top[0][0],
         "probability": float(top[0][1]),

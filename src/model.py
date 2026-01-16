@@ -57,30 +57,60 @@ def find_latest_checkpoint(pattern="models/best_*.pt"):
     latest = max(files, key=os.path.getctime)
     return latest
 
+def get_device():
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def load_model(
+    ckpt_path: str,
+    num_classes: int = 8,
+    backbone: str = "resnet18",
+    pretrained: bool = False,
+    freeze_backbone: bool = True,
+    droprate: float = 0.8,
+    size_inner: int = 512,
+    device=None,
+):
+    """
+    Import-safe: does NOT run unless you call it.
+    Returns (model, device, ckpt_metadata_dict)
+    """
+    if device is None:
+        device = get_device()
 
-# Load the best model (tuned with lr=0.01, inner=512, dropout=0.8)
-best_ckpt = "models/best_lr_0.01_inner_512_drop_0.8.pt"
-if not os.path.exists(best_ckpt):
-    print(f"Best checkpoint not found at {best_ckpt}, using latest available...")
-    ckpt_path = find_latest_checkpoint("models/best_*.pt")
-else:
-    ckpt_path = best_ckpt
+    model = CryResNet(
+        num_classes=num_classes,
+        backbone=backbone,
+        pretrained=pretrained,
+        freeze_backbone=freeze_backbone,
+        droprate=droprate,
+        size_inner=size_inner,
+    ).to(device)
 
-print("Loading model from:", ckpt_path)
+    state = torch.load(ckpt_path, map_location=device)
+    if isinstance(state, dict) and "model_state_dict" in state:
+        model.load_state_dict(state["model_state_dict"])
+    else:
+        model.load_state_dict(state)
 
-num_classes = 8
-model = CryResNet(num_classes=num_classes, backbone="resnet18", pretrained=False, droprate=0.8, size_inner=512)
-state = torch.load(ckpt_path, map_location=device)
+    model.eval()
+    return model, device
 
-if isinstance(state, dict) and "model_state_dict" in state:
-    model.load_state_dict(state["model_state_dict"])
-else:
-    # If you saved state_dict directly
-    model.load_state_dict(state)
+def main():
+    best_ckpt = "models/checkpoints/best_lr_0.01_inner_512_drop_0.8.pt"
+    ckpt_path = best_ckpt if os.path.exists(best_ckpt) else find_latest_checkpoint("models/best_*.pt")
+    print("Loading model from:", ckpt_path)
 
-model.to(device)
-model.eval()
+    model, device, meta = load_model(
+        ckpt_path=ckpt_path,
+        num_classes=8,
+        backbone="resnet18",
+        pretrained=False,
+        freeze_backbone=True,
+        droprate=0.8,
+        size_inner=512,
+    )
+    print("Model loaded and ready on device:", device)
+    return model, device, meta
 
-print("Model loaded and ready on device:", device)
+if __name__ == "__main__":
+    main()
