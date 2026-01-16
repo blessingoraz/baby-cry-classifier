@@ -4,6 +4,10 @@ import torch
 import torch.nn as nn
 import torchvision.models as models
 
+# NOTE:
+# Model checkpoint is stored in GitHub Releases (v1.0.0)
+# https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0
+
 class CryResNet(nn.Module):
     def __init__(
         self,

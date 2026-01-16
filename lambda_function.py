@@ -8,6 +8,8 @@ import requests
 import librosa
 import onnxruntime as ort
 
+# ONNX model artifact:
+# https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0
 
 # ---------- Config ----------
 MODEL_NAME = os.getenv("MODEL_NAME", "baby_cry_classification_resnet18.onnx")
