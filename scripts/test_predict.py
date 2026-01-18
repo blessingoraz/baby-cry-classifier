@@ -9,10 +9,10 @@ import requests
 
 
 print("Invoking local Lambda function...")
-invoke_url = "http://localhost:9000/2015-03-31/functions/function/invocations"
+invoke_url = "https://ikfuba8us0.execute-api.eu-north-1.amazonaws.com/default/babycry-lambda"
 
 event = {
-    "url": "https://raw.githubusercontent.com/blessingoraz/baby-cry-classifier/main/data/raw/belly_pain/549a46d8-9c84-430e-ade8-97eae2bef787-1430130772174-1.7-m-48-bp.wav"
+    "url": "https://raw.githubusercontent.com/blessingoraz/baby-cry-classifier/main/data/raw/tired/7A22229D-06C2-4AAA-9674-DE5DF1906B3A-1436891944-1.1-m-72-ti.wav"
 }
 
 result = requests.post(invoke_url, json=event).json()
