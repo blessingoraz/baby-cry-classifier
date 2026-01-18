@@ -117,6 +117,7 @@ The model was trained using supervised learning with the following setup:
 - **Evaluation metric:** **Macro-F1 score**
   - Chosen due to class imbalance (ensures fair evaluation across all classes)
 
+NB: “Training uses librosa; inference uses a lightweight DSP pipeline to avoid numba/librosa runtime constraints in AWS Lambda.”
 
 ## Results
 The final model achieved its best performance with the following configuration:
@@ -250,6 +251,85 @@ Then access the API at `http://localhost:8000/docs`
 docker run babycry-classifier:latest pytest tests/ -v
 ```
 
+## AWS Deployment
+
+### Live API Endpoint
+
+A production instance is deployed and ready to test:
+
+**Base URL:** `https://ikfuba8us0.execute-api.eu-north-1.amazonaws.com/default/babycry-lambda`
+
+### Testing the Live API
+
+Send audio file URL to the Lambda function:
+
+```bash
+curl -X POST "https://ikfuba8us0.execute-api.eu-north-1.amazonaws.com/default/babycry-lambda" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://raw.githubusercontent.com/blessingoraz/baby-cry-classifier/main/data/raw/belly_pain/549a46d8-9c84-430e-ade8-97eae2bef787-1430130772174-1.7-m-48-bp.wav"}'
+```
+
+**Response Example:**
+
+```json
+{
+  "belly_pain": 0.0009,
+  "burping": 0.0005,
+  "cold_hot": 0.0000,
+  "discomfort": 0.0090,
+  "hungry": 0.9873,
+  "lonely": 0.0011,
+  "scared": 0.0000,
+  "tired": 0.0012
+}
+```
+
+### Sample Audio Files
+
+You can test with these sample files from different classes:
+
+- **Belly Pain:** `https://raw.githubusercontent.com/blessingoraz/baby-cry-classifier/main/data/raw/belly_pain/549a46d8-9c84-430e-ade8-97eae2bef787-1430130772174-1.7-m-48-bp.wav`
+- **Hungry:** `https://raw.githubusercontent.com/blessingoraz/baby-cry-classifier/main/data/raw/hungry/0c8f14a9-6999-485b-97a2-913c1cbf099c-1430760394426-1.7-m-26-hu.wav`
+- **Tired:** `https://raw.githubusercontent.com/blessingoraz/baby-cry-classifier/main/data/raw/tired/7A22229D-06C2-4AAA-9674-DE5DF1906B3A-1436891944-1.1-m-72-ti.wav`
+
+Or use any publicly accessible `.wav` file URL!
+
+### How to Deploy Your Own
+
+1. **Build and push Docker image to ECR:**
+   ```bash
+   # Authenticate with ECR
+   aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin YOUR_ACCOUNT.dkr.ecr.eu-north-1.amazonaws.com
+   
+   # Build and push (update account ID and tag)
+   docker buildx build \
+     --platform linux/amd64 \
+     -t YOUR_ACCOUNT.dkr.ecr.eu-north-1.amazonaws.com/babycry-lambda:v1 \
+     --provenance=false \
+     --push \
+     .
+   ```
+
+2. **Create Lambda function:**
+   - AWS Lambda Console → Create Function
+   - Select "Container image"
+   - Point to your ECR image URI
+   - Set timeout to 60 seconds (audio download + inference)
+   - Allocate 1024+ MB memory
+
+3. **Create API Gateway trigger:**
+   - Add API Gateway trigger
+   - Create new REST API
+   - Set method to POST
+   - Map requests to Lambda
+
+4. **Test:**
+   ```bash
+   curl -X POST "YOUR_API_ENDPOINT" \
+     -H "Content-Type: application/json" \
+     -d '{"url": "https://example.com/cry.wav"}'
+   ```
+
 ## API Usage
 
 ### FastAPI Interactive Docs
@@ -293,6 +373,23 @@ curl -X POST "http://localhost:8000/predict" \
   }
 }
 ```
+
+**Response Fields Explanation:**
+
+- **`label`** — The predicted cry class with highest confidence
+- **`probability`** — Confidence score for the top prediction (0.0 to 1.0)
+- **`top_k`** — Array of top k predictions (default k=3, configurable via `top_k` parameter)
+  - Ranked by probability in descending order
+  - Useful for showing alternatives when confidence is moderate
+- **`all_probs`** — Complete probability distribution across all 8 cry classes
+  - Probabilities sum to 1.0 (softmax output)
+  - Can be used for custom thresholding or ensemble voting
+  - Very low probabilities (e.g., 0.00) indicate the model is very confident that class is not present
+
+**Example Interpretation:**
+- Model predicts **`belly_pain` with 62% confidence**
+- Second best guess is **`hungry` (21%)**
+- If 62% confidence is too low for your use case, you could use `top_k` results or set a custom threshold
 
 ## Unit Tests
 
