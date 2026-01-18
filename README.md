@@ -41,6 +41,7 @@ Each audio file is:
 
 The dataset is imbalanced, with some classes significantly underrepresented. Class weighting and macro-F1 were therefore used during training and evaluation.
 
+---
 
 ## Model Architecture
 
@@ -103,6 +104,7 @@ The dataset is imbalanced, with some classes significantly underrepresented. Cla
   - Output layer with 8 classes + softmax
 - **Single-channel spectrograms:** Converted to 3-channel inputs to match ResNet18 architecture
 
+---
 ## Training & Evaluation
 The model was trained using supervised learning with the following setup:
 
@@ -127,7 +129,7 @@ The selected checkpoint maximized macro-F1 on the validation set.
 
 Model artifacts are versioned and available via GitHub Releases.
 
-
+---
 ## Setup & Installation
 
 ### Prerequisites
@@ -193,6 +195,7 @@ The trained model is exported to two formats:
 - AWS Lambda using ONNX Runtime
 
 
+---
 ## Project Structure
 ```
 src/
@@ -332,6 +335,8 @@ Run with coverage:
 pytest tests/ --cov=src --cov-report=html
 ```
 
+
+---
 ## Reproducibility
 - All experiments were run with fixed random seeds
 - Model configuration and hyperparameters are documented
@@ -362,6 +367,8 @@ docker build -t babycry-classifier .
 docker run -p 8000:8000 babycry-classifier
 ```
 
+
+---
 ## Troubleshooting
 
 **Issue: Model file not found**
@@ -377,17 +384,15 @@ docker run -p 8000:8000 babycry-classifier
 - Solution: Run `pip install -r requirements.txt` again or `pip install -r requirements.txt --upgrade`
 
 
-## Demo (Screenshots / Video)
+## Demo (Screenshots)
 ### Local Inference
 ![Prediction Output](docs/images/prediction_output.png)
 
 ### API Demo
 ![FastAPI Swagger UI](docs/images/swagger_ui.png)
 
-🎥 Demo video:
-https://youtu.be/your-video-link
 
-
+---
 ## Model Artifacts
 
 Due to size constraints, trained model files are not stored directly in Git.
@@ -413,11 +418,11 @@ https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0
 
 
 ## References
-- Librosa: Audio analysis library
-- PyTorch & TorchVision
-- ONNX Runtime
-- FastAPI: Modern async web framework
-- Docker: Container deployment
+- [Librosa: Audio analysis library](https://librosa.org/doc/latest/generated/librosa.load.html)
+- [PyTorch & TorchVision](https://docs.pytorch.org/docs/stable/index.html)
+- [ONNX Runtime](https://onnxruntime.ai/)
+- [FastAPI: Modern async web framework](https://fastapi.tiangolo.com/)
+- [Docker: Container deployment](https://www.docker.com/)
 
 ---
 
