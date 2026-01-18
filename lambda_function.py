@@ -1,15 +1,23 @@
 import os
+import requests
+
 import json
 import tempfile
 from urllib.parse import urlparse
 
 import numpy as np
-import requests
-import librosa
+import soundfile as sf
+from scipy.signal import stft
+
 import onnxruntime as ort
+
 
 # ONNX model artifact:
 # https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0
+
+# NOTE: Lambda inference uses a lightweight DSP pipeline (numpy-based) instead of librosa
+# to avoid numba JIT compilation and caching overhead, which can cause cold start issues
+# in AWS Lambda. Training notebooks use librosa for preprocessing; inference is optimized.
 
 # ---------- Config ----------
 MODEL_NAME = os.getenv("MODEL_NAME", "baby_cry_classification_resnet18.onnx")
@@ -65,46 +73,101 @@ def _download_to_temp(url: str) -> str:
 
 
 def _load_and_fix_length(path: str) -> np.ndarray:
-    y, _ = librosa.load(path, sr=TARGET_SR, mono=True)
+    # Read wav/pcm
+    y, sr = sf.read(path, dtype="float32", always_2d=False)
 
+    # If stereo, convert to mono
+    if y.ndim > 1:
+        y = y.mean(axis=1)
+
+    # Resample if needed (simple, good enough for 8k target)
+    if sr != TARGET_SR:
+        # linear resample (fast + dependency-light)
+        x_old = np.linspace(0, 1, num=len(y), endpoint=False)
+        x_new = np.linspace(0, 1, num=int(len(y) * TARGET_SR / sr), endpoint=False)
+        y = np.interp(x_new, x_old, y).astype(np.float32)
+
+    # Fix length
     if len(y) > FIXED_LEN:
         y = y[:FIXED_LEN]
     elif len(y) < FIXED_LEN:
         y = np.pad(y, (0, FIXED_LEN - len(y)))
+
     return y
 
+def _hz_to_mel(hz: np.ndarray) -> np.ndarray:
+    return 2595.0 * np.log10(1.0 + hz / 700.0)
 
-def _mel_to_model_input(path: str) -> np.ndarray:
-    """
-    Returns input array for ONNX model:
-      shape: (1, 1, 224, 224), dtype float32
-    """
-    y = _load_and_fix_length(path)
+def _mel_to_hz(mel: np.ndarray) -> np.ndarray:
+    return 700.0 * (10.0 ** (mel / 2595.0) - 1.0)
 
-    mel = librosa.feature.melspectrogram(
-        y=y, sr=TARGET_SR, n_mels=N_MELS, n_fft=N_FFT, hop_length=HOP_LENGTH
-    )
-    mel_db = librosa.power_to_db(mel, ref=np.max)
+def _mel_filterbank(sr: int, n_fft: int, n_mels: int, fmin: float = 0.0, fmax: float = None) -> np.ndarray:
+    if fmax is None:
+        fmax = sr / 2
 
-    # Normalize to 0-1 (match training approach)
-    mel_db = (mel_db - mel_db.min()) / (mel_db.max() - mel_db.min() + 1e-9)
+    # FFT bin frequencies
+    fft_freqs = np.linspace(0, sr / 2, n_fft // 2 + 1)
 
-    # Resize to (224,224) using simple numpy approach
-    # We'll use librosa.util.fix_length + repeat for time axis then crop/pad
-    # But easiest: use np.interp for both axes
-    H, W = mel_db.shape  # (128, time)
-    target_h, target_w = OUT_SIZE
+    # Mel points
+    mel_min = _hz_to_mel(np.array([fmin], dtype=np.float32))[0]
+    mel_max = _hz_to_mel(np.array([fmax], dtype=np.float32))[0]
+    mels = np.linspace(mel_min, mel_max, n_mels + 2)
+    hz = _mel_to_hz(mels)
 
-    # Resize H dimension
+    # Convert Hz to FFT bin numbers
+    bins = np.floor((n_fft + 1) * hz / sr).astype(int)
+    bins = np.clip(bins, 0, n_fft // 2)
+
+    fb = np.zeros((n_mels, n_fft // 2 + 1), dtype=np.float32)
+
+    for i in range(n_mels):
+        left, center, right = bins[i], bins[i + 1], bins[i + 2]
+        if center == left:
+            center += 1
+        if right == center:
+            right += 1
+    
+        # Rising slope
+        fb[i, left:center] = (np.arange(left, center) - left) / (center - left + 1e-9)
+        # Falling slope
+        fb[i, center:right] = (right - np.arange(center, right)) / (right - center + 1e-9)
+
+    return fb
+
+def _resize_2d(m: np.ndarray, target_h: int, target_w: int) -> np.ndarray:
+    # Simple bilinear-ish resize using interpolation on each axis
+    H, W = m.shape
     x_h = np.linspace(0, H - 1, target_h)
     x_w = np.linspace(0, W - 1, target_w)
 
-    mel_resized = np.zeros((target_h, target_w), dtype=np.float32)
+    out = np.zeros((target_h, target_w), dtype=np.float32)
     for i, hh in enumerate(x_h):
-        row = np.interp(x_w, np.arange(W), mel_db[int(round(hh))])
-        mel_resized[i] = row
+        out[i] = np.interp(x_w, np.arange(W), m[int(round(hh))])
+    return out
 
-    # Shape: (1,1,224,224)
+
+def _mel_to_model_input(path: str) -> np.ndarray:
+    y = _load_and_fix_length(path)
+
+    # STFT -> magnitude spectrogram
+    _, _, Zxx = stft(y, fs=TARGET_SR, nperseg=N_FFT, noverlap=N_FFT - HOP_LENGTH, nfft=N_FFT, padded=False, boundary=None)
+    S = np.abs(Zxx).astype(np.float32) ** 2  # power spectrogram, shape (freq_bins, frames)
+
+    # Mel filterbank
+    fb = _mel_filterbank(TARGET_SR, N_FFT, N_MELS)  # (n_mels, freq_bins)
+    mel = fb @ S  # (n_mels, frames)
+
+    # dB scale (approx)
+    mel = np.maximum(mel, 1e-10)
+    mel_db = 10.0 * np.log10(mel)
+
+    # Normalize 0-1
+    mel_db = (mel_db - mel_db.min()) / (mel_db.max() - mel_db.min() + 1e-9)
+
+    # Resize to 224x224
+    mel_resized = _resize_2d(mel_db.astype(np.float32), OUT_SIZE[0], OUT_SIZE[1])
+
+    # Shape (1,1,224,224)
     X = mel_resized[np.newaxis, np.newaxis, :, :].astype(np.float32)
     return X
 
@@ -131,14 +194,37 @@ def predict_from_url(url: str) -> dict:
 
 
 def lambda_handler(event, context):
-    """
-    Expects:
-      event = {"url": "https://.../audio.wav"}
-    Returns:
-      {"classA": 0.12, "classB": 0.03, ...}
-    """
     try:
-        url = event["url"]
-        return predict_from_url(url)
+        # API Gateway/Lambda Function URL, payload is in event["body"]
+        if isinstance(event, dict) and "body" in event and event["body"] is not None:
+            body = event["body"]
+            if isinstance(body, str):
+                body = json.loads(body)
+            url = body["url"]
+        else:
+            # Direct invoke (Lambda console test, local runtime invoke)
+            url = event["url"]
+
+        result = predict_from_url(url)
+
+        # If API Gateway expects a proxy response, return a proper HTTP response
+        if isinstance(event, dict) and "body" in event:
+            return {
+                "statusCode": 200,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps(result)
+            }
+
+        return result
+
     except Exception as e:
-        return {"error": str(e)}
+        err = {"error": str(e)}
+
+        if isinstance(event, dict) and "body" in event:
+            return {
+                "statusCode": 400,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps(err)
+            }
+
+        return err
