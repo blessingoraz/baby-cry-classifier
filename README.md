@@ -1,5 +1,31 @@
 # Baby Cry Classification using CNNs
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Problem Statement](#problem-statement)
+- [Dataset](#dataset)
+- [Model Architecture](#model-architecture)
+- [Training, Evaluation & Results](#training--evaluation)
+- [Setup & Installation](#setup--installation)
+- [Quick Start](#quick-start)
+- [Inference & Deployment](#inference--deployment)
+- [Project Structure](#project-structure)
+- [Docker Deployment](#docker-deployment)
+- [AWS Deployment](#aws-deployment)
+- [API Usage](#api-usage)
+- [Unit Tests](#unit-tests)
+- [Common Commands](#common-commands)
+- [Troubleshooting](#troubleshooting)
+- [Reproducibility](#reproducibility)
+- [Demo](#demo-screenshots)
+- [Model Artifacts](#model-artifacts)
+- [Limitations & Future Work](#limitations--future-work)
+- [References](#references)
+- [Project Information](#project-information)
+
+---
+
 ## Overview
 This project implements a multi-class baby cry classification system using Convolutional Neural Networks (CNNs) trained on mel-spectrogram representations of audio signals.
 
@@ -457,7 +483,7 @@ pytest tests/test_api.py::TestPredictEndpoint -v
 uvicorn src.api:app --reload
 
 # Test single audio file
-python scripts/test_predict.py data/raw/hungry/filename.wav
+python scripts/test_predict.py
 
 # Docker
 docker build -t babycry-classifier .
@@ -482,9 +508,9 @@ docker run -p 8000:8000 babycry-classifier
 
 
 ## Demo (Screenshots)
-### Local Inference
-![Prediction Output](docs/images/prediction_output.png)
-
+### AWS Lambda deployment
+![Lambda Success](docs/images/lambda_success.png)
+![API Gateway](docs/images/api_gateway.png)
 ### API Demo
 ![FastAPI Swagger UI](docs/images/swagger_ui.png)
 
