@@ -197,7 +197,7 @@ Then visit `http://localhost:8000/docs`
 
 ### 2. Command Line
 ```bash
-python scripts/test_predict.py path/to/audio.wav
+python scripts/test_predict.py
 ```
 
 ### 3. Python Script
