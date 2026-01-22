@@ -45,6 +45,8 @@ Challenges include:
 ## Dataset
 The dataset consists of labeled baby cry audio recordings grouped into 8 distinct classes:
 
+**Source:** [Baby Cry Dataset on Kaggle](https://www.kaggle.com/datasets/mennaahmed23/baby-cry-dataset/data)
+
 | Class ID | Class Name | Samples | Description |
 |----------|-----------|---------|-------------|
 | 0 | **belly_pain** | 16 | Cry indicating abdominal discomfort or digestive issues |
