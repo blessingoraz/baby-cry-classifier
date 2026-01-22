@@ -183,9 +183,15 @@ source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Download model artifacts from [GitHub Releases v1.0.0](https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0):
-   - `best_lr_0.01_inner_512_drop_0.8.pt` → `models/checkpoints/`
-   - `baby_cry_classification_resnet18.onnx` → `models/onnx/` (for ONNX inference)
+4. Download model artifacts from [GitHub Releases v1.0.0](https://github.com/blessingoraz/baby-cry-classifier/releases/tag/v1.0.0) and save them locally:
+   - Download `best_lr_0.01_inner_512_drop_0.8.pt` and save to `models/checkpoints/`
+   - Download `baby_cry_classification_resnet18.onnx` and save to `models/onnx/` (for ONNX inference)
+   
+   Create the directories if they don't exist:
+   ```bash
+   mkdir -p models/checkpoints
+   mkdir -p models/onnx
+   ```
 
 ## Quick Start
 
